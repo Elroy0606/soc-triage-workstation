@@ -1,0 +1,463 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>IOC Defanger Hub</title>
+<meta name="description" content="Extract, defang, refang and pivot on indicators of compromise. Runs entirely in your browser.">
+<style>
+:root{
+  --bg:#f6f7f9; --panel:#ffffff; --text:#1b1f24; --muted:#5b6470; --border:#d9dde3;
+  --accent:#0b6bcb; --accent-text:#ffffff; --code-bg:#f1f3f6; --warn:#a15c00; --warn-bg:#fff4e0;
+  --t-url:#7a3fc4; --t-domain:#0b6bcb; --t-ipv4:#0f7b4f; --t-ipv6:#0f7b4f; --t-email:#b0476a;
+  --t-hash:#8a5a00; --t-cve:#c0392b;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#0f1216; --panel:#171b21; --text:#e6e9ed; --muted:#9aa4b1; --border:#2a313a;
+    --accent:#4ea1ff; --accent-text:#0b0e12; --code-bg:#1f252d; --warn:#ffb454; --warn-bg:#2b2213;
+    --t-url:#b88cff; --t-domain:#6db3ff; --t-ipv4:#4fd39a; --t-ipv6:#4fd39a; --t-email:#ff8fb5;
+    --t-hash:#f2c14e; --t-cve:#ff7b6b;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#0f1216; --panel:#171b21; --text:#e6e9ed; --muted:#9aa4b1; --border:#2a313a;
+  --accent:#4ea1ff; --accent-text:#0b0e12; --code-bg:#1f252d; --warn:#ffb454; --warn-bg:#2b2213;
+  --t-url:#b88cff; --t-domain:#6db3ff; --t-ipv4:#4fd39a; --t-ipv6:#4fd39a; --t-email:#ff8fb5;
+  --t-hash:#f2c14e; --t-cve:#ff7b6b;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border);background:var(--panel)}
+header h1{font-size:18px;margin:0}
+header p{margin:0;color:var(--muted);font-size:13px}
+main{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.4fr);gap:16px;padding:16px;max-width:1500px;margin:0 auto}
+@media (max-width:900px){main{grid-template-columns:minmax(0,1fr)}}
+section{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:14px;min-width:0}
+h2{font-size:15px;margin:0 0 10px}
+textarea{width:100%;min-height:340px;resize:vertical;background:var(--code-bg);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:10px;font:13px/1.45 ui-monospace,Consolas,monospace}
+textarea.small{min-height:90px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+button,.btn{background:var(--code-bg);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 11px;font:inherit;font-size:13px;cursor:pointer}
+button:hover{border-color:var(--accent)}
+button.primary{background:var(--accent);color:var(--accent-text);border-color:var(--accent)}
+label.chk{display:inline-flex;gap:6px;align-items:center;font-size:13px;color:var(--muted);cursor:pointer}
+input[type=search]{flex:1;min-width:140px;background:var(--code-bg);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:6px 10px;font:inherit;font-size:13px}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px}
+.chip{border:1px solid var(--border);border-radius:999px;padding:3px 10px;font-size:12px;cursor:pointer;user-select:none;background:var(--code-bg)}
+.chip[aria-pressed="false"]{opacity:.45;text-decoration:line-through}
+.chip b{margin-left:4px}
+.table-wrap{overflow-x:auto;border:1px solid var(--border);border-radius:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--border);vertical-align:top}
+th{background:var(--code-bg);font-weight:600;position:sticky;top:0}
+tr:last-child td{border-bottom:none}
+td.ioc{font-family:ui-monospace,Consolas,monospace;word-break:break-all}
+.badge{display:inline-block;font-size:11px;font-weight:600;padding:1px 7px;border-radius:5px;border:1px solid currentColor;white-space:nowrap}
+.t-url{color:var(--t-url)}.t-domain{color:var(--t-domain)}.t-ipv4{color:var(--t-ipv4)}.t-ipv6{color:var(--t-ipv6)}
+.t-email{color:var(--t-email)}.t-md5,.t-sha1,.t-sha256{color:var(--t-hash)}.t-cve{color:var(--t-cve)}
+.note{font-size:11px;color:var(--warn);background:var(--warn-bg);border-radius:4px;padding:0 5px;margin-left:6px;white-space:nowrap}
+.pivots a{display:inline-block;margin:0 6px 3px 0;color:var(--accent);font-size:12px;text-decoration:none;white-space:nowrap}
+.pivots a:hover{text-decoration:underline}
+.copy{padding:2px 7px;font-size:11px}
+.empty{color:var(--muted);padding:24px;text-align:center}
+.muted{color:var(--muted);font-size:12px}
+details{margin-top:12px}
+summary{cursor:pointer;font-size:13px;color:var(--muted)}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--text);color:var(--bg);padding:7px 14px;border-radius:7px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none}
+#toast.show{opacity:1}
+footer{text-align:center;color:var(--muted);font-size:12px;padding:8px 16px 24px}
+</style>
+</head>
+<body>
+<header>
+  <div>
+    <h1>IOC Defanger &amp; Threat Enrichment Hub</h1>
+    <p>Extract, defang, refang and pivot on indicators. Everything runs in your browser; nothing is uploaded.</p>
+  </div>
+  <button id="themeBtn" title="Toggle theme">◐ Theme</button>
+</header>
+
+<main>
+  <section>
+    <h2>1. Paste text</h2>
+    <textarea id="input" spellcheck="false" placeholder="Paste a threat report, phishing email headers, log lines, alert JSON… Defanged indicators like hxxps://evil[.]com or 10[.]0[.]0[.]1 are recognized automatically."></textarea>
+    <div class="row">
+      <button class="primary" id="defangTextBtn" title="Rewrite the text above with every indicator defanged">Defang text</button>
+      <button id="refangTextBtn" title="Rewrite the text above with every indicator refanged (live)">Refang text</button>
+      <button id="sampleBtn">Load sample</button>
+      <button id="clearBtn">Clear</button>
+      <label class="btn" title="Load a .txt, .log, .csv, .json, .eml file">Open file<input type="file" id="fileIn" hidden accept=".txt,.log,.csv,.json,.eml,.md,.xml,.html"></label>
+    </div>
+    <details>
+      <summary>Options</summary>
+      <div class="row">
+        <label class="chk"><input type="checkbox" id="optPrivate" checked> Show private / reserved IPs</label>
+        <label class="chk"><input type="checkbox" id="optAllow"> Hide allowlisted domains</label>
+        <label class="chk"><input type="checkbox" id="optUrlHosts" checked> Also list domains found inside URLs / emails</label>
+      </div>
+      <p class="muted">Allowlist (one domain per line; subdomains match too):</p>
+      <textarea id="allowlist" class="small" spellcheck="false"></textarea>
+    </details>
+  </section>
+
+  <section>
+    <h2>2. Indicators</h2>
+    <div class="chips" id="chips"></div>
+    <div class="row" style="margin-top:0;margin-bottom:10px">
+      <input type="search" id="search" placeholder="Filter results…">
+      <label class="chk"><input type="checkbox" id="optShowDefanged" checked> Show defanged</label>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>Type</th><th>Indicator</th><th>Pivot</th><th></th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty">No indicators yet. Paste something on the left.</div>
+    </div>
+    <div class="row">
+      <button id="copyListBtn">Copy list</button>
+      <button id="copyMdBtn" title="Markdown table for tickets and reports">Copy as Markdown</button>
+      <button id="csvBtn">Export CSV</button>
+      <button id="jsonBtn">Export JSON</button>
+      <span class="muted" id="countLbl"></span>
+    </div>
+    <p class="muted">Pivot links open third-party sites in a new tab. Clicking one sends that indicator to the site; nothing is sent until you click.</p>
+  </section>
+</main>
+<footer>Built by Elroy Fernandes · <a href="https://elcybersec.com" style="color:inherit">elcybersec.com</a></footer>
+<div id="toast" role="status"></div>
+
+<script>
+"use strict";
+
+/* ---------- storage helpers (never required) ---------- */
+const store = {
+  get(k, d){ try{ const v = localStorage.getItem(k); return v === null ? d : JSON.parse(v); }catch{ return d; } },
+  set(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch{} }
+};
+
+/* ---------- theme ---------- */
+const root = document.documentElement;
+const savedTheme = store.get("ioc.theme", null);
+if (savedTheme) root.dataset.theme = savedTheme;
+document.getElementById("themeBtn").onclick = () => {
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  store.set("ioc.theme", root.dataset.theme);
+};
+
+/* ---------- refang / defang ---------- */
+function refang(s){
+  return s
+    .replace(/\bh(?:xx|XX|\[xx\]|\[XX\]|\*\*)p(s?)(?=\[?:)/gi, "http$1")
+    .replace(/\bfxp(?=\[?:)/gi, "ftp")
+    .replace(/\[:\/\/\]|\[:\]\/\//g, "://")
+    .replace(/\[\s*:\s*\]/g, ":")
+    .replace(/\[\s*\/\s*\]/g, "/")
+    .replace(/\[\s*(?:\.|dot)\s*\]|\(\s*(?:\.|dot)\s*\)|\{\s*(?:\.|dot)\s*\}|\\\./gi, ".")
+    .replace(/\[\s*(?:@|at)\s*\]|\(\s*(?:@|at)\s*\)|\{\s*(?:@|at)\s*\}/gi, "@");
+}
+
+const defang = {
+  url(u){
+    return u.replace(/^http/i, m => m[0] + "xx" + m[3]).replace(/^ftp/i, "fxp")
+            .replace("://", "[://]").replace(/\./g, "[.]");
+  },
+  domain: d => d.replace(/\./g, "[.]"),
+  ipv4:   i => i.replace(/\./g, "[.]"),
+  ipv6:   i => i.replace(/:/g, "[:]"),
+  email:  e => e.replace("@", "[@]").replace(/\./g, "[.]"),
+};
+const defangValue = (type, v) => (defang[type] ? defang[type](v) : v);
+
+/* ---------- detection ---------- */
+// Common TLDs. Kept as an allowlist to avoid false positives like "invoice.pdf" or "payload.exe".
+const TLDS = new Set(("com net org edu gov mil int io co ai app dev xyz info biz me tv cc us uk ca au de fr it es nl be ch at se no dk fi pl cz sk hu ro bg gr pt ie ru ua by kz cn jp kr in id my sg th vn ph hk tw br ar mx cl pe ve za ng ke eg ma tr il ir sa ae qa pk bd lk nz online site top club shop store live tech space website pw ws tk ml ga cf gq su cyou icu buzz rest bond sbs cfd lol fun link click work world today email cloud host digital network services support solutions page") .split(" "));
+
+const RE = {
+  url:    /\b(?:https?|ftp):\/\/[^\s"'<>`\]\[(){}|\\^]+/gi,
+  email:  /\b[a-z0-9._%+-]+@(?:[a-z0-9-]+\.)+[a-z]{2,24}\b/gi,
+  ipv4:   /(?<![\d.])(?:(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)\.){3}(?:25[0-5]|2[0-4]\d|1\d\d|[1-9]?\d)(?!\.?\d)/g,
+  ipv6:   /(?<![\w:])(?:[0-9a-f]{0,4}:){2,7}[0-9a-f]{0,4}(?![\w:])/gi,
+  sha256: /\b[a-f0-9]{64}\b/gi,
+  sha1:   /\b[a-f0-9]{40}\b/gi,
+  md5:    /\b[a-f0-9]{32}\b/gi,
+  cve:    /\bCVE-\d{4}-\d{4,7}\b/gi,
+  domain: /\b(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,24}\b/gi,
+};
+
+const trimUrl = u => u.replace(/[.,;:!?'")\]}>]+$/, "");
+const validIPv6 = c => /[0-9a-f]/i.test(c) && (c.match(/:/g) || []).length >= 2 && (() => { try{ new URL(`http://[${c}]/`); return true; }catch{ return false; } })();
+
+function ipv4Note(ip){
+  const [a,b] = ip.split(".").map(Number);
+  if (a === 10 || (a === 172 && b >= 16 && b <= 31) || (a === 192 && b === 168)) return "Private (RFC 1918)";
+  if (a === 127) return "Loopback";
+  if (a === 169 && b === 254) return "Link-local";
+  if (a === 100 && b >= 64 && b <= 127) return "CGNAT";
+  if (a === 0) return "Reserved";
+  if (a >= 224 && a <= 239) return "Multicast";
+  if (a >= 240) return "Reserved";
+  if ((a === 192 && b === 0) || (a === 198 && (b === 18 || b === 19 || b === 51)) || (a === 203 && b === 0)) return "Doc/test range";
+  return "";
+}
+function ipv6Note(ip){
+  const l = ip.toLowerCase();
+  if (l === "::1") return "Loopback";
+  if (/^fe[89ab]/.test(l)) return "Link-local";
+  if (/^f[cd]/.test(l)) return "Unique local";
+  if (l.startsWith("2001:db8")) return "Doc range";
+  return "";
+}
+
+function extract(rawText, opts){
+  const text = refang(rawText);
+  const found = new Map(); // key -> item (preserves first-seen order)
+  const add = (type, value, note = "") => {
+    const v = (type === "md5" || type === "sha1" || type === "sha256" || type === "domain" || type === "email") ? value.toLowerCase()
+            : type === "cve" ? value.toUpperCase() : value;
+    const key = type + "|" + v;
+    if (!found.has(key)) found.set(key, { type, value: v, note });
+  };
+
+  const urls = (text.match(RE.url) || []).map(trimUrl);
+  urls.forEach(u => add("url", u));
+
+  const emails = text.match(RE.email) || [];
+  emails.forEach(e => add("email", e));
+
+  (text.match(RE.ipv4) || []).forEach(ip => add("ipv4", ip, ipv4Note(ip)));
+  (text.match(RE.ipv6) || []).filter(validIPv6).forEach(ip => add("ipv6", ip, ipv6Note(ip)));
+
+  // Hashes: \b boundaries ensure exact length, so one hash never matches as another.
+  (text.match(RE.sha256) || []).forEach(h => add("sha256", h));
+  (text.match(RE.sha1)   || []).forEach(h => add("sha1", h));
+  (text.match(RE.md5)    || []).forEach(h => add("md5", h));
+  (text.match(RE.cve)    || []).forEach(c => add("cve", c));
+
+  // Domains: either everywhere, or only those not inside a URL/email.
+  let domainText = text;
+  if (!opts.urlHosts) {
+    urls.concat(emails).forEach(s => { domainText = domainText.split(s).join(" "); });
+  }
+  (domainText.match(RE.domain) || []).forEach(d => {
+    const tld = d.split(".").pop().toLowerCase();
+    if (TLDS.has(tld)) add("domain", d);
+  });
+
+  return [...found.values()];
+}
+
+/* ---------- enrichment pivots ---------- */
+const enc = encodeURIComponent;
+function pivots(type, v){
+  switch (type) {
+    case "ipv4": case "ipv6": return [
+      ["VirusTotal", `https://www.virustotal.com/gui/ip-address/${enc(v)}`],
+      ["AbuseIPDB",  `https://www.abuseipdb.com/check/${enc(v)}`],
+      ["Shodan",     `https://www.shodan.io/host/${enc(v)}`],
+      ["GreyNoise",  `https://viz.greynoise.io/ip/${enc(v)}`],
+      ["Talos",      `https://talosintelligence.com/reputation_center/lookup?search=${enc(v)}`],
+    ];
+    case "domain": return [
+      ["VirusTotal", `https://www.virustotal.com/gui/domain/${enc(v)}`],
+      ["urlscan",    `https://urlscan.io/domain/${enc(v)}`],
+      ["URLhaus",    `https://urlhaus.abuse.ch/browse.php?search=${enc(v)}`],
+      ["Talos",      `https://talosintelligence.com/reputation_center/lookup?search=${enc(v)}`],
+      ["WHOIS",      `https://who.is/whois/${enc(v)}`],
+    ];
+    case "url": return [
+      ["VirusTotal", `https://www.virustotal.com/gui/search/${enc(enc(v))}`],
+      ["URLhaus",    `https://urlhaus.abuse.ch/browse.php?search=${enc(v)}`],
+      ["urlscan",    `https://urlscan.io/search/#${enc('page.url:"' + v + '"')}`],
+    ];
+    case "md5": case "sha1": case "sha256": return [
+      ["VirusTotal",      `https://www.virustotal.com/gui/file/${v}`],
+      ["MalwareBazaar",   `https://bazaar.abuse.ch/browse.php?search=${type}%3A${v}`],
+      ["Hybrid Analysis", `https://www.hybrid-analysis.com/search?query=${v}`],
+    ];
+    case "email": {
+      const dom = v.split("@")[1];
+      return [["Domain on VirusTotal", `https://www.virustotal.com/gui/domain/${enc(dom)}`]];
+    }
+    case "cve": return [
+      ["NVD",      `https://nvd.nist.gov/vuln/detail/${v}`],
+      ["CISA KEV", `https://www.cisa.gov/known-exploited-vulnerabilities-catalog?search_api_fulltext=${v}`],
+      ["MITRE",    `https://www.cve.org/CVERecord?id=${v}`],
+    ];
+  }
+  return [];
+}
+
+/* ---------- state & rendering ---------- */
+const TYPE_LABEL = { url:"URL", domain:"Domain", ipv4:"IPv4", ipv6:"IPv6", email:"Email", md5:"MD5", sha1:"SHA1", sha256:"SHA256", cve:"CVE" };
+const TYPE_ORDER = Object.keys(TYPE_LABEL);
+const $ = id => document.getElementById(id);
+const els = { input:$("input"), rows:$("rows"), chips:$("chips"), empty:$("empty"), search:$("search"), count:$("countLbl"),
+  optPrivate:$("optPrivate"), optAllow:$("optAllow"), optUrlHosts:$("optUrlHosts"), optShowDefanged:$("optShowDefanged"), allowlist:$("allowlist") };
+
+const DEFAULT_ALLOW = "microsoft.com\nwindows.com\nwindowsupdate.com\ngoogle.com\ngoogleapis.com\napple.com\namazonaws.com\ncloudflare.com\ngithub.com\nmitre.org\nnist.gov";
+els.allowlist.value = store.get("ioc.allow", DEFAULT_ALLOW);
+els.optAllow.checked = store.get("ioc.optAllow", false);
+els.optPrivate.checked = store.get("ioc.optPrivate", true);
+els.optUrlHosts.checked = store.get("ioc.optUrlHosts", true);
+els.optShowDefanged.checked = store.get("ioc.optShowDefanged", true);
+
+let items = [];
+const hiddenTypes = new Set();
+
+function allowSet(){
+  return els.allowlist.value.split(/\s+/).map(s => s.trim().toLowerCase()).filter(Boolean);
+}
+function isAllowlisted(it, allow){
+  let host = "";
+  if (it.type === "domain") host = it.value;
+  else if (it.type === "email") host = it.value.split("@")[1];
+  else if (it.type === "url") { try{ host = new URL(it.value).hostname.toLowerCase(); }catch{} }
+  return !!host && allow.some(a => host === a || host.endsWith("." + a));
+}
+
+function visibleItems(){
+  const q = els.search.value.trim().toLowerCase();
+  const allow = els.optAllow.checked ? allowSet() : [];
+  return items.filter(it =>
+    !hiddenTypes.has(it.type) &&
+    (els.optPrivate.checked || !it.note || (it.type !== "ipv4" && it.type !== "ipv6")) &&
+    !(allow.length && isAllowlisted(it, allow)) &&
+    (!q || it.value.toLowerCase().includes(q) || defangValue(it.type, it.value).toLowerCase().includes(q))
+  );
+}
+
+function shown(it){ return els.optShowDefanged.checked ? defangValue(it.type, it.value) : it.value; }
+
+function el(tag, attrs = {}, ...kids){
+  const n = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs)) {
+    if (k === "class") n.className = v; else if (k.startsWith("on")) n[k] = v; else n.setAttribute(k, v);
+  }
+  kids.flat().forEach(k => n.append(k instanceof Node ? k : document.createTextNode(String(k))));
+  return n;
+}
+
+function render(){
+  // chips
+  const counts = {};
+  items.forEach(it => counts[it.type] = (counts[it.type] || 0) + 1);
+  els.chips.replaceChildren(...TYPE_ORDER.filter(t => counts[t]).map(t =>
+    el("span", { class:`chip t-${t}`, role:"button", tabindex:"0", "aria-pressed": String(!hiddenTypes.has(t)),
+      onclick(){ hiddenTypes.has(t) ? hiddenTypes.delete(t) : hiddenTypes.add(t); render(); },
+      onkeydown(e){ if (e.key === "Enter" || e.key === " ") { e.preventDefault(); this.click(); } } },
+      TYPE_LABEL[t], el("b", {}, counts[t]))));
+
+  const vis = visibleItems();
+  els.rows.replaceChildren(...vis.map(it => {
+    const val = shown(it);
+    return el("tr", {},
+      el("td", {}, el("span", { class:`badge t-${it.type}` }, TYPE_LABEL[it.type])),
+      el("td", { class:"ioc" }, val, it.note ? el("span", { class:"note" }, it.note) : ""),
+      el("td", { class:"pivots" }, pivots(it.type, it.value).map(([name, href]) =>
+        el("a", { href, target:"_blank", rel:"noopener noreferrer" }, name))),
+      el("td", {}, el("button", { class:"copy", title:"Copy", onclick(){ copy(val); } }, "Copy")));
+  }));
+  els.empty.style.display = vis.length ? "none" : "";
+  els.empty.textContent = items.length ? "Everything is filtered out." : "No indicators yet. Paste something on the left.";
+  els.count.textContent = items.length ? `${vis.length} of ${items.length} shown` : "";
+}
+
+function run(){
+  items = extract(els.input.value, { urlHosts: els.optUrlHosts.checked });
+  render();
+}
+
+/* ---------- text rewrite ---------- */
+function defangText(raw){
+  let t = refang(raw);
+  // Order matters: URLs and emails first so their inner domains are already defanged.
+  t = t.replace(RE.url, m => { const u = trimUrl(m); return defang.url(u) + m.slice(u.length); });
+  t = t.replace(RE.email, defang.email);
+  t = t.replace(RE.ipv4, defang.ipv4);
+  t = t.replace(RE.ipv6, m => validIPv6(m) ? defang.ipv6(m) : m);
+  t = t.replace(RE.domain, d => TLDS.has(d.split(".").pop().toLowerCase()) ? defang.domain(d) : d);
+  return t;
+}
+
+/* ---------- output helpers ---------- */
+function toast(msg){
+  const t = $("toast"); t.textContent = msg; t.classList.add("show");
+  clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 1400);
+}
+async function copy(text){
+  try { await navigator.clipboard.writeText(text); toast("Copied"); }
+  catch {
+    const ta = el("textarea"); ta.value = text; document.body.append(ta); ta.select();
+    try { document.execCommand("copy"); toast("Copied"); } catch { toast("Copy failed"); }
+    ta.remove();
+  }
+}
+function download(name, mime, data){
+  const a = el("a", { href: URL.createObjectURL(new Blob([data], { type: mime })), download: name });
+  document.body.append(a); a.click(); setTimeout(() => { URL.revokeObjectURL(a.href); a.remove(); }, 500);
+}
+const stamp = () => new Date().toISOString().slice(0,19).replace(/[:T]/g, "-");
+const csvCell = s => /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+const rowsOut = () => visibleItems().map(it => ({ type: TYPE_LABEL[it.type], indicator: defangValue(it.type, it.value), raw: it.value, note: it.note }));
+
+$("copyListBtn").onclick = () => { const v = visibleItems(); v.length ? copy(v.map(shown).join("\n")) : toast("Nothing to copy"); };
+$("copyMdBtn").onclick = () => {
+  const r = rowsOut(); if (!r.length) return toast("Nothing to copy");
+  copy(["| Type | Indicator (defanged) | Note |", "|---|---|---|",
+        ...r.map(x => `| ${x.type} | \`${x.indicator}\` | ${x.note} |`)].join("\n"));
+};
+$("csvBtn").onclick = () => {
+  const r = rowsOut(); if (!r.length) return toast("Nothing to export");
+  download(`iocs-${stamp()}.csv`, "text/csv",
+    ["type,indicator_defanged,indicator_raw,note", ...r.map(x => [x.type, x.indicator, x.raw, x.note].map(csvCell).join(","))].join("\n"));
+};
+$("jsonBtn").onclick = () => {
+  const r = rowsOut(); if (!r.length) return toast("Nothing to export");
+  download(`iocs-${stamp()}.json`, "application/json", JSON.stringify({ generated: new Date().toISOString(), count: r.length, indicators: r }, null, 2));
+};
+
+/* ---------- input wiring ---------- */
+let debounce;
+els.input.addEventListener("input", () => { clearTimeout(debounce); debounce = setTimeout(run, 150); });
+els.search.addEventListener("input", render);
+[["optPrivate","ioc.optPrivate"],["optAllow","ioc.optAllow"],["optShowDefanged","ioc.optShowDefanged"]].forEach(([k, key]) =>
+  els[k].addEventListener("change", () => { store.set(key, els[k].checked); render(); }));
+els.optUrlHosts.addEventListener("change", () => { store.set("ioc.optUrlHosts", els.optUrlHosts.checked); run(); });
+els.allowlist.addEventListener("input", () => { store.set("ioc.allow", els.allowlist.value); render(); });
+
+$("defangTextBtn").onclick = () => { els.input.value = defangText(els.input.value); run(); toast("Text defanged"); };
+$("refangTextBtn").onclick = () => { els.input.value = refang(els.input.value); run(); toast("Text refanged: indicators are live, handle with care"); };
+$("clearBtn").onclick = () => { els.input.value = ""; run(); els.input.focus(); };
+$("fileIn").onchange = async e => {
+  const f = e.target.files[0]; if (!f) return;
+  if (f.size > 5 * 1024 * 1024) return toast("File too large (5 MB max)");
+  els.input.value = await f.text(); e.target.value = ""; run();
+};
+els.input.addEventListener("dragover", e => e.preventDefault());
+els.input.addEventListener("drop", async e => {
+  const f = e.dataTransfer.files[0]; if (!f) return;
+  e.preventDefault(); els.input.value = await f.text(); run();
+});
+
+$("sampleBtn").onclick = () => {
+  els.input.value =
+`ALERT: Suspicious PowerShell download cradle on WS-0142
+Initial lure sent from billing[@]invoice-portal-secure[.]com to finance team.
+Payload fetched from hxxps://cdn-update-check[.]xyz/stage2/loader.ps1
+C2 beacons observed to 203.0.113.45:443 and 198[.]51[.]100[.]23 every 60s.
+Internal pivot host: 10.20.4.17   IPv6 peer: 2001:db8:85a3::8a2e:370:7334
+Dropped file invoice_0931.pdf.exe
+  MD5:    44d88612fea8a8f36de82e1278abb02f
+  SHA256: 275a021bbfb6489e54d471899f7db9d1663fc695ec2fe2a2c4538aabf651fd0f
+Exploited edge device vuln CVE-2024-3400 for initial access.
+(Hashes above are the harmless EICAR test file; IPs are documentation ranges.)`;
+  run();
+};
+
+run();
+</script>
+</body>
+</html>
